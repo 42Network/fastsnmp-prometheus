@@ -1,0 +1,88 @@
+version: "3.3"
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+     - ./monitor/prometheus.yml:/etc/prometheus/prometheus.yml
+     - ./alertmanager/alert.rules:/alertmanager/alert.rules
+    command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
+    ports:
+     - 9090:9090
+    restart: always
+    depends_on:
+     - node-exporter
+       
+####node-exporter####
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports:
+     - "9100:9100"
+    restart: always
+#    network_mode: host
+  grafana:
+    image: grafana/grafana
+    ports:
+     - "3000:3000"
+    restart: always
+    command: "GF_SECURITY_ADMIN_PASSWORD=secret"
+    depends_on:
+      - prometheus
+####snmp_exporter####
+  snmp-exporter:
+    image: prom/snmp-exporter
+    volumes:
+     - ./snmp/snmp.yml:/etc/snmp_exporter/snmp.yml
+    ports:
+      - "9116:9116"
+    restart: always
+    depends_on:
+       - prometheus
+
+#######cadvisor############
+
+  cadvisor:
+     image: google/cadvisor:latest
+#     container_name: cadvisor
+     ports:
+     - 8080:8080
+     restart: always
+     volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+     depends_on:
+     - prometheus
+
+###########alertmanager################
+
+  alertmanager:
+    image: prom/alertmanager:latest
+#    container_name: alertmanager
+    volumes:
+      - ./alertmanager/:/etc/alertmanager/
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    restart: unless-stopped
+    ports:
+      - 9093:9093
+    depends_on:
+      - prometheus
+
+############blackbox_exporter#############
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter
+    ports:
+      - "9115:9115"
+    dns: 8.8.8.8
+    restart: always
+    ports:
+      - "9115:9115"
+    volumes:
+      - "./config:/config"
+    depends_on:
+      - prometheus
+
